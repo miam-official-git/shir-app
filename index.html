@@ -68,7 +68,8 @@
     <div class="tab active" onclick="switchTab(0)"><span class="tab-icon">📚</span>שיעור</div>
     <div class="tab" onclick="switchTab(1)"><span class="tab-icon">❌</span>ביטול</div>
     <div class="tab" onclick="switchTab(2)"><span class="tab-icon">💰</span>תשלום</div>
-    <div class="tab" onclick="switchTab(3)"><span class="tab-icon">⚙️</span>הגדרות</div>
+    <div class="tab" onclick="switchTab(3)"><span class="tab-icon">🔍</span>שאלות</div>
+    <div class="tab" onclick="switchTab(4)"><span class="tab-icon">⚙️</span>הגדרות</div>
   </div>
 
   <div class="content">
@@ -156,6 +157,28 @@
 
     <div class="panel" id="panel3">
       <div class="card">
+        <div class="card-title">🔍 שאלות מהירות</div>
+
+        <label>מתי שיעור אחרון?</label>
+        <div class="student-wrap" style="margin-bottom:10px">
+          <span class="search-icon">🔍</span>
+          <input class="student-search" type="text" id="q-search" placeholder="חפשי תלמידה..." oninput="filterStudents('q')">
+          <select class="student-select" id="q-student"><option value="">— בחרי תלמידה —</option></select>
+        </div>
+        <button class="btn" id="q-btn" onclick="doLastLesson()" style="margin-bottom:20px">מתי שיעור אחרון? ←</button>
+        <div class="status-box" id="q-result" style="display:none"></div>
+
+        <div style="border-top:2px solid #f3e8ff; margin: 20px 0 18px"></div>
+
+        <label>חובות תלמידות</label>
+        <p class="info-text" style="margin-bottom:12px">רשימת כל התלמידות עם חוב פתוח</p>
+        <button class="btn" onclick="doDebts()">הצג חובות ←</button>
+        <div id="debts-list" style="margin-top:16px"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel4">
+      <div class="card">
         <div class="card-title">🔄 סנכרון אוטומטי</div>
         <p class="info-text">בודק כל 6 שעות אם יש שיעורים במאנדיי שחסרים ביומן גוגל ומוסיף אותם. רץ על שרתי גוגל גם כשהטלפון כבוי. לעולם לא מוחק כלום.</p>
         <div class="status-box" id="trigger-status">⏳ בודק סטטוס...</div>
@@ -224,6 +247,42 @@
     function switchTab(n) {
       document.querySelectorAll('.tab').forEach(function(t,i){ t.classList.toggle('active', i===n); });
       document.querySelectorAll('.panel').forEach(function(p,i){ p.classList.toggle('active', i===n); });
+    }
+
+    function doLastLesson() {
+      var sel = document.getElementById('q-student');
+      if (!sel.value) { showToast('❌ יש לבחור תלמידה', 'error'); return; }
+      var name = sel.options[sel.selectedIndex].getAttribute('data-name');
+      document.getElementById('q-btn').disabled = true;
+      document.getElementById('q-result').style.display = 'none';
+      callGAS('getLastLesson', { studentName: name })
+        .then(function(r) {
+          document.getElementById('q-btn').disabled = false;
+          var box = document.getElementById('q-result');
+          box.style.display = 'flex';
+          box.textContent = r.success ? r.message : '⚠️ ' + r.message;
+        })
+        .catch(function(){ document.getElementById('q-btn').disabled = false; showToast('❌ בעיית חיבור', 'error'); });
+    }
+
+    function doDebts() {
+      var list = document.getElementById('debts-list');
+      list.innerHTML = '<div style="text-align:center;color:#7c3aed;padding:12px">⏳ טוען...</div>';
+      callGAS('getDebts')
+        .then(function(r) {
+          if (!r.success) { list.innerHTML = '<div style="color:#dc2626;padding:8px">⚠️ ' + r.message + '</div>'; return; }
+          if (!r.debts || r.debts.length === 0) {
+            list.innerHTML = '<div class="status-box">✅ אין חובות פתוחים</div>';
+            return;
+          }
+          list.innerHTML = r.debts.map(function(d) {
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:white;border:2px solid #ede9fe;border-radius:12px;margin-bottom:10px;font-weight:600">' +
+              '<span>' + d.name + '</span>' +
+              '<span style="color:#dc2626;font-size:1.1rem">₪' + d.debt + '</span>' +
+              '</div>';
+          }).join('');
+        })
+        .catch(function(){ list.innerHTML = '<div style="color:#dc2626;padding:8px">❌ בעיית חיבור</div>'; });
     }
 
     function doAddLesson() {
